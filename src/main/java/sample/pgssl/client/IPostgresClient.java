@@ -1,10 +1,9 @@
-package sample.pgssl;
+package sample.pgssl.client;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.pgclient.PgConnectOptions;
 import io.vertx.pgclient.SslMode;
-import io.vertx.pgclient.pubsub.PgSubscriber;
 import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.RowSet;
 import io.vertx.sqlclient.RowStream;
@@ -14,10 +13,6 @@ public interface IPostgresClient {
     Future<RowSet<Row>> preparedQuery(String query, Tuple tuple);
 
     Future<IPostgresTransaction> transaction();
-
-    Future<RowStream<Row>> queryStream(String query, Tuple tuple, int batchSize);
-
-    PostgresClientChannel getClientChannel();
 
     static IPostgresClient create(final Vertx vertx, final JsonObject config, final boolean bus, final boolean pool) throws Exception{
         final JsonObject postgresConfig = getPostgresConfig(vertx, config);
@@ -54,13 +49,6 @@ public interface IPostgresClient {
                 throw new Exception("Missing postgresConfig config");
             }
         }
-    }
-
-
-    static PostgresClientChannel createChannel(final Vertx vertx, final JsonObject config) throws Exception {
-        final JsonObject realConfig = getPostgresConfig(vertx, config);
-        final PgSubscriber pgSubscriber = PgSubscriber.subscriber(vertx, IPostgresClient.getConnectOption(realConfig));
-        return new PostgresClientChannel(pgSubscriber, config);
     }
 
     static PgConnectOptions getConnectOption(final JsonObject config){

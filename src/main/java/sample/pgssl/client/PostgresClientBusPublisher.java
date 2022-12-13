@@ -1,4 +1,4 @@
-package sample.pgssl;
+package sample.pgssl.client;
 
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -9,10 +9,9 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.pgclient.pubsub.PgSubscriber;
 import io.vertx.sqlclient.*;
 
-import static sample.pgssl.PostgresClientBusHelper.*;
+import static sample.pgssl.client.PostgresClientBusHelper.*;
 
 public class PostgresClientBusPublisher implements IPostgresClient {
 
@@ -77,17 +76,6 @@ public class PostgresClientBusPublisher implements IPostgresClient {
             return promise.future().mapEmpty();
         });
         return Future.succeededFuture(transa);
-    }
-
-    @Override
-    public PostgresClientChannel getClientChannel() {
-        final PgSubscriber pgSubscriber = PgSubscriber.subscriber(vertx, IPostgresClient.getConnectOption(config));
-        return new PostgresClientChannel(pgSubscriber, config);
-    }
-
-    @Override
-    public Future<RowStream<Row>> queryStream(String query, Tuple tuple, int batchSize) {
-        throw new RuntimeException("cannot query row stream using bus");
     }
 
 }

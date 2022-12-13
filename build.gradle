@@ -32,6 +32,7 @@ dependencies {
     compile "io.vertx:vertx-pg-client:$vertxVersion"
     compile "com.ongres.scram:client:$scramVersion"
     compile "io.vertx:vertx-unit:$vertxVersion"
+    compile "org.postgresql:postgresql:$postgresDriverVersion"
     compile "org.testcontainers:postgresql:$testContainerVersion"
 }
 

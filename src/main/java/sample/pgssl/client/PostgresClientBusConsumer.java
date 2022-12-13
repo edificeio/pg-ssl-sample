@@ -1,4 +1,4 @@
-package sample.pgssl;
+package sample.pgssl.client;
 
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
@@ -12,7 +12,7 @@ import io.vertx.sqlclient.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import static sample.pgssl.PostgresClientBusHelper.*;
+import static sample.pgssl.client.PostgresClientBusHelper.*;
 
 public class PostgresClientBusConsumer implements IPostgresClient {
     private static final Logger log = LoggerFactory.getLogger(PostgresClientBusConsumer.class);
@@ -108,16 +108,6 @@ public class PostgresClientBusConsumer implements IPostgresClient {
 
     public void stop(){
         this.consumer.unregister();
-    }
-
-    @Override
-    public PostgresClientChannel getClientChannel() {
-        return pgClient.getClientChannel();
-    }
-
-    @Override
-    public Future<RowStream<Row>> queryStream(String query, Tuple tuple, int batchSize) {
-        return pgClient.queryStream(query, tuple, batchSize);
     }
 
     @Override

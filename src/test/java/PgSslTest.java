@@ -3,6 +3,7 @@
  */
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -10,25 +11,28 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
-import io.vertx.pgclient.PgConnectOptions;
 import io.vertx.pgclient.SslMode;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.testcontainers.containers.PostgreSQLContainer;
+import sample.pgssl.verticles.PgFromBusEventLoop;
+import sample.pgssl.verticles.PgFromBusWorker;
+import sample.pgssl.verticles.PgFromEventLoop;
+import sample.pgssl.verticles.PgFromWorker;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.*;
-
 @RunWith(VertxUnitRunner.class)
 public class PgSslTest {
+
     @ClassRule
     public static PostgreSQLContainer<?> pg = new PostgreSQLContainer<>("postgres:14-ssl")
             .withDatabaseName("pgssl")
             .withUsername("pgssl")
-            .withPassword("pgssl");
+            .withPassword("pgssl").withInitScript("schema.sql");
+
     static Logger log = LoggerFactory.getLogger(PgSslTest.class);
     final Vertx vertx = Vertx.vertx();
 
@@ -42,9 +46,22 @@ public class PgSslTest {
         postgresConfig.put("user", pg.getUsername());
         postgresConfig.put("password", pg.getPassword());
         final JsonObject config = new JsonObject().put("postgresConfig",postgresConfig);
-        vertx.deployVerticle(new PgFromBus(), new DeploymentOptions().setConfig(config), context.asyncAssertSuccess());
+        vertx.deployVerticle(new PgFromBusEventLoop(), new DeploymentOptions().setConfig(config), context.asyncAssertSuccess());
+        vertx.deployVerticle(new PgFromBusWorker(), new DeploymentOptions().setConfig(config).setWorker(true), context.asyncAssertSuccess());
         vertx.deployVerticle(new PgFromEventLoop(), new DeploymentOptions().setConfig(config), context.asyncAssertSuccess());
         vertx.deployVerticle(new PgFromWorker(), new DeploymentOptions().setConfig(config).setWorker(true), context.asyncAssertSuccess());
+    }
+
+    @Test
+    public void shouldSucceedToInitFromEventLoop(final TestContext context) {
+        final EventBus bus = vertx.eventBus();
+        final JsonObject body = new JsonObject();
+        log.info("Trying to query from event loop");
+        final Async async = context.async();
+        bus.request(PgFromEventLoop.ADDRESS, body, context.asyncAssertSuccess(result -> {
+            log.info("Test has succeed as expected | body="+result.body());
+            async.complete();
+        }));
     }
 
     @Test
@@ -52,17 +69,10 @@ public class PgSslTest {
         final EventBus bus = vertx.eventBus();
         final JsonObject body = new JsonObject();
         log.info("Trying to query from worker");
+        final Async async = context.async();
         bus.request(PgFromWorker.ADDRESS, body, context.asyncAssertFailure(result -> {
-            log.info("Test has failed as expected");
-        }));
-    }
-    @Test
-    public void shouldSucceedToInitFromEventLoop(final TestContext context) {
-        final EventBus bus = vertx.eventBus();
-        final JsonObject body = new JsonObject();
-        log.info("Trying to query from event loop");
-        bus.request(PgFromEventLoop.ADDRESS, body, context.asyncAssertSuccess(result -> {
-            log.info("Test has succeed as expected");
+            log.warn("Test has failed as expected | error="+result.getMessage());
+            async.complete();
         }));
     }
 
@@ -71,21 +81,26 @@ public class PgSslTest {
         final int max = 5;
         final EventBus bus = vertx.eventBus();
         final JsonObject body = new JsonObject();
-        final Async async = context.async(max);
+        final Async async = context.async(max*2);
         log.info("Trying to query from bus");
         final AtomicInteger count = new AtomicInteger();
         for(int i = 0 ; i < max; i++){
             final int temp = i;
-            bus.request(PgFromBus.ADDRESS, body,result -> {
-                log.info(String.format("Test n° %s | result=%s | cause=%s", temp, result.succeeded(), result.cause()));
-                if(result.succeeded()){
+            bus.request(PgFromBusWorker.ADDRESS, body, result -> {
+                log.info(String.format("Test n° %s | result=%s | body=%s | cause=%s", temp, result.succeeded(),result.result().body(), result.cause()));
+                if(result.failed()){
                     count.incrementAndGet();
                 }
                 async.countDown();
             });
+            //make query from worker while making query from event loop
+            bus.request(PgFromWorker.ADDRESS, body, context.asyncAssertFailure(result -> {
+                async.countDown();
+            }));
         }
         async.handler(result -> {
             log.info(String.format("Count finish | count = %s | succeed=%s", async.count(), count.get()));
+            //context.assertTrue(count.get() > 0, String.format("Count=%s", count.get()));
         });
     }
 }

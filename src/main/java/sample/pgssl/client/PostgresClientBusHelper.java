@@ -1,4 +1,4 @@
-package sample.pgssl;
+package sample.pgssl.client;
 
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
